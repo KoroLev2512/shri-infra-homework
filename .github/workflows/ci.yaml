@@ -2,7 +2,6 @@ name: ci
 
 on:
   pull_request:
-    branches: [ main ]
 
 jobs:
   lint:
@@ -10,7 +9,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-node@v3
-        with: { node-version: '18' }
+        with: { node-version: '24' }
       - run: npm ci
       - run: npm run lint
 
@@ -19,6 +18,6 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-node@v3
-        with: { node-version: '18' }
+        with: { node-version: '24' }
       - run: npm ci
       - run: npm run test
