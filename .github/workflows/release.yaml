@@ -60,6 +60,8 @@ jobs:
           
       - name: update CHANGELOG.md
         run: |
+          git config user.name "github_actions" && \
+          git config user.email "actions@github.com" && \
           echo "## ${{ env.VERSION }} — $(date +'%Y-%m-%d')" > tmp && \
           git log --pretty=format:'- %s' $(git describe --tags --abbrev=0 HEAD^)..HEAD >> tmp && \
           cat CHANGELOG.md >> tmp && mv tmp CHANGELOG.md && \
