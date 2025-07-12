@@ -1,0 +1,67 @@
+name: Deploy to Prod
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release deploy version (for deploy)'
+        required: true
+
+env:
+  VERSION: ${{ github.event.inputs.version }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Pull image to verify it exists
+        run: |
+          echo "${{ secrets.YC_OAUTH_TOKEN }}" \
+            | docker login --username oauth --password-stdin cr.yandex
+          docker pull cr.yandex/${{ secrets.YC_REGISTRY_ID }}/app:${{ env.VERSION }}_latest
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VM_IP }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            echo "${{ secrets.YC_OAUTH_TOKEN }}" \
+              | docker login --username oauth --password-stdin cr.yandex
+
+            docker pull cr.yandex/${{ secrets.YC_REGISTRY_ID }}/app:${{ env.VERSION }}_latest
+            
+            docker stop app || true
+            docker rm app || true
+
+            docker run -d \
+              --name app \
+              -p 3000:3000 \
+              cr.yandex/${{ secrets.YC_REGISTRY_ID }}/app:${{ env.VERSION }}_latest
+
+      - name: Find Release Issue number
+        id: find_issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ISSUE_NUMBER=$(gh issue list \
+            --search "Release ${{ env.VERSION }}" \
+            --state all \
+            --json number \
+            --jq '.[0].number')
+          echo "Found issue #${ISSUE_NUMBER}"
+          echo "ISSUE_NUMBER=$ISSUE_NUMBER" >> $GITHUB_ENV
+      
+      - name: Comment on Release Issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          COMMENT_BODY=$(cat <<EOF
+          **Deploy Date:** $(date +'%Y-%m-%d')
+          
+          **Deploy Author:** @${{ github.actor }}
+          EOF
+          )
+          gh issue comment ${{ env.ISSUE_NUMBER }} --body "${COMMENT_BODY}"
