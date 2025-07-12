@@ -41,6 +41,12 @@ jobs:
               -p 3000:3000 \
               cr.yandex/${{ secrets.YC_REGISTRY_ID }}/app:${{ env.VERSION }}_latest
 
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
       - name: Find Release Issue number
         id: find_issue
         env:
