@@ -63,6 +63,7 @@ jobs:
 
       - name: Comment on release Issue
         env:
+          GH_TOKEN: ${{ github.token }}
           VERSION: ${{ env.VERSION }}
           FIX_NO: ${{ env.FIX_NO }}
           REGID: ${{ secrets.YC_REGISTRY_ID }}
