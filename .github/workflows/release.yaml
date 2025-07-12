@@ -1,0 +1,68 @@
+name: Release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  lint-plus-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with: { node-version: '24' }
+        
+      - name: installing dependencies
+        run: npm ci
+
+      - name: running linter
+        run: npm run lint
+
+      - name: running tests
+        run: npm run test
+
+  create-release:
+    needs: lint-plus-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: define version
+        run: echo "VERSION=${{ github.run_number }}" >> $GITHUB_ENV
+        
+      - name: create release branch
+        run: |
+          git config user.name "github_actions"
+          git config user.email "actions@github.com"
+          git checkout -b releases/${VERSION}
+          git push origin releases/${VERSION}
+          
+      - name: build & push docker
+        env:
+          YC_REGISTRY: cr.yandex/${{ secrets.YC_REGISTRY_ID }}/app
+        run: |
+          echo ${{ secrets.YC_OAUTH_TOKEN }} | docker login --username oauth --password-stdin cr.yandex
+          docker build -t ${YC_REGISTRY}:${VERSION} -t ${YC_REGISTRY}:${VERSION}_latest .
+          docker push ${YC_REGISTRY}:${VERSION}
+          docker push ${YC_REGISTRY}:${VERSION}_latest
+          
+      - name: create git-tag
+        run: |
+          git tag ${VERSION}
+          git push origin ${VERSION}
+          
+      - name: update CHANGELOG.md
+        run: |
+          echo "## ${VERSION} — $(date +'%Y-%m-%d')" > tmp && \
+          git log --pretty=format:'- %s' $(git describe --tags --abbrev=0 HEAD^)..HEAD >> tmp && \
+          cat CHANGELOG.md >> tmp && mv tmp CHANGELOG.md && \
+          git commit -am "chore: update CHANGELOG for ${VERSION}" && \
+          git push origin main
+          
+      - name: create issue
+        run: |
+          gh issue create \
+            --title "Release ${VERSION}" \
+            --body "$(printf "**Date:** %s\n**Author:** @%s\n**Version:** %s\n**Commits:**\n%s\n**Docker image:** cr.yandex/%s/app:%s" \
+              "$(date +'%Y-%m-%d')" "${{ github.actor }}" "${VERSION}" \
+              "$(git log --pretty=format:'- %s' $(git describe --tags --abbrev=0 HEAD^)..HEAD)" \
+              "${{ secrets.YC_REGISTRY_ID }}" "${VERSION}"
