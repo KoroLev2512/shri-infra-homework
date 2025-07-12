@@ -81,6 +81,13 @@ jobs:
     needs: update-changelog
     runs-on: ubuntu-latest
     steps:
+      - name: сheckout release branch
+        uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: releases/${{ env.VERSION }}
+          fetch-depth: 0
+    
       - name: create issue
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
