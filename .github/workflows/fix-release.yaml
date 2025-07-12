@@ -61,6 +61,19 @@ jobs:
           git tag ${VERSION}-fix${FIX_NO}
           git push origin ${VERSION}-fix${FIX_NO}
 
+      - name: Find Release Issue number
+        id: find_issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ISSUE_NUMBER=$(gh issue list \
+            --search "Release ${{ env.VERSION }}" \
+            --state all \
+            --json number \
+            --jq '.[0].number')
+          echo "Found issue #${ISSUE_NUMBER}"
+          echo "ISSUE_NUMBER=$ISSUE_NUMBER" >> $GITHUB_ENV
+
       - name: Comment on release Issue
         env:
           GH_TOKEN: ${{ github.token }}
@@ -84,4 +97,4 @@ jobs:
           **Docker image:** cr.yandex/${REGID}/app:${VERSION}_fix${FIX_NO}
           EOF
           )
-          gh issue comment ${VERSION} --body "${COMMENT_BODY}"
+          gh issue comment ${{ env.ISSUE_NUMBER }} --body "${COMMENT_BODY}"
