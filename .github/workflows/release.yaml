@@ -1,4 +1,4 @@
-name: Create release
+name: Create Release
 env:
   VERSION: ${{ github.run_number }}
 
@@ -55,28 +55,56 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: releases/${{ env.VERSION }}
           fetch-depth: 0
-          
+
+      - name: configure git
+        run: |
+          git config user.name "github_actions"
+          git config user.email "actions@github.com"
+
       - name: update CHANGELOG.md
         run: |
-          echo "## ${{ env.VERSION }} — $(date +'%Y-%m-%d')" > tmp && \
-          git log --pretty=format:'- %s' $(git describe --tags --abbrev=0 HEAD^)..HEAD >> tmp && \
-          cat CHANGELOG.md >> tmp && mv tmp CHANGELOG.md && \
-          git commit -am "chore: update CHANGELOG for ${{ env.VERSION }}" && \
-          git push origin main
+          PREV=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null \
+               || git rev-list --max-parents=0 HEAD)
+
+          echo "## ${{ env.VERSION }} — $(date +'%Y-%m-%d')" > tmp
+          git log --pretty=format:'- %s' $PREV..HEAD >> tmp
+          cat CHANGELOG.md >> tmp
+          mv tmp CHANGELOG.md
+
+          git commit -am "chore: update CHANGELOG for ${{ env.VERSION }}"
+          git push origin releases/${{ env.VERSION }}
 
   create-issue:
     needs: update-changelog
     runs-on: ubuntu-latest
     steps:
-      - uses: cli/gh-action@v2
-      
+      - name: сheckout release branch
+        uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: releases/${{ env.VERSION }}
+          fetch-depth: 0
+    
       - name: create issue
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          YC_REGISTRY: cr.yandex/${{ secrets.YC_REGISTRY_ID }}/app
         run: |
           gh issue create \
             --title "Release ${{ env.VERSION }}" \
-            --body "$(printf "**Date:** %s\n**Author:** @%s\n**Version:** %s\n**Commits:**\n%s\n**Docker image:** cr.yandex/%s/app:%s" \
-              "$(date +'%Y-%m-%d')" "${{ github.actor }}" "${{ env.VERSION }}" \
-              "$(git log --pretty=format:'- %s' $(git describe --tags --abbrev=0 HEAD^)..HEAD)" \
-              "${{ secrets.YC_REGISTRY_ID }}" "${{ env.VERSION }}"
+            --body "$(cat <<EOF\
+          
+          **Date:** $(date +'%Y-%m-%d')
+          
+          **Author:** @${GITHUB_ACTOR}
+          
+          **Commits since last release:**
+          $(git log --pretty=format:'- %s' $(git describe --tags --abbrev=0 HEAD^)..HEAD)
+  
+          **Docker image:**
+          ${YC_REGISTRY}:${{ env.VERSION }}
+          EOF
+          )"
