@@ -1,4 +1,6 @@
 name: Create release
+env:
+  VERSION: ${{ github.run_number }}
 
 on:
   workflow_dispatch:
@@ -25,44 +27,56 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
-      - name: define version
-        run: echo "VERSION=${{ github.run_number }}" >> $GITHUB_ENV
         
       - name: create release branch
         run: |
           git config user.name "github_actions"
           git config user.email "actions@github.com"
-          git checkout -b releases/${VERSION}
-          git push origin releases/${VERSION}
+          git checkout -b releases/${{ env.VERSION }}
+          git push origin releases/${{ env.VERSION }}
           
       - name: build & push docker
         env:
           YC_REGISTRY: cr.yandex/${{ secrets.YC_REGISTRY_ID }}/app
         run: |
           echo ${{ secrets.YC_OAUTH_TOKEN }} | docker login --username oauth --password-stdin cr.yandex
-          docker build -t ${YC_REGISTRY}:${VERSION} -t ${YC_REGISTRY}:${VERSION}_latest .
-          docker push ${YC_REGISTRY}:${VERSION}
-          docker push ${YC_REGISTRY}:${VERSION}_latest
+          docker build -t ${YC_REGISTRY}:${{ env.VERSION }} -t ${YC_REGISTRY}:${{ env.VERSION }}_latest .
+          docker push ${YC_REGISTRY}:${{ env.VERSION }}
+          docker push ${YC_REGISTRY}:${{ env.VERSION }}_latest
           
       - name: create git-tag
         run: |
-          git tag ${VERSION}
-          git push origin ${VERSION}
+          git tag ${{ env.VERSION }}
+          git push origin ${{ env.VERSION }}
+
+  update-changelog:
+    needs: create-release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: main
+          fetch-depth: 0
           
       - name: update CHANGELOG.md
         run: |
-          echo "## ${VERSION} — $(date +'%Y-%m-%d')" > tmp && \
+          echo "## ${{ env.VERSION }} — $(date +'%Y-%m-%d')" > tmp && \
           git log --pretty=format:'- %s' $(git describe --tags --abbrev=0 HEAD^)..HEAD >> tmp && \
           cat CHANGELOG.md >> tmp && mv tmp CHANGELOG.md && \
-          git commit -am "chore: update CHANGELOG for ${VERSION}" && \
+          git commit -am "chore: update CHANGELOG for ${{ env.VERSION }}" && \
           git push origin main
-          
+
+  create-issue:
+    needs: update-changelog
+    runs-on: ubuntu-latest
+    steps:
+      - uses: cli/gh-action@v2
+      
       - name: create issue
         run: |
           gh issue create \
-            --title "Release ${VERSION}" \
+            --title "Release ${{ env.VERSION }}" \
             --body "$(printf "**Date:** %s\n**Author:** @%s\n**Version:** %s\n**Commits:**\n%s\n**Docker image:** cr.yandex/%s/app:%s" \
-              "$(date +'%Y-%m-%d')" "${{ github.actor }}" "${VERSION}" \
+              "$(date +'%Y-%m-%d')" "${{ github.actor }}" "${{ env.VERSION }}" \
               "$(git log --pretty=format:'- %s' $(git describe --tags --abbrev=0 HEAD^)..HEAD)" \
-              "${{ secrets.YC_REGISTRY_ID }}" "${VERSION}"
+              "${{ secrets.YC_REGISTRY_ID }}" "${{ env.VERSION }}"
