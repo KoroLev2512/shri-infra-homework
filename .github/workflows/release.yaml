@@ -84,10 +84,20 @@ jobs:
       - name: create issue
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          YC_REGISTRY: cr.yandex/${{ secrets.YC_REGISTRY_ID }}/app
         run: |
           gh issue create \
             --title "Release ${{ env.VERSION }}" \
-            --body "$(printf "**Date:** %s\n**Author:** @%s\n**Version:** %s\n**Commits:**\n%s\n**Docker image:** cr.yandex/%s/app:%s" \
-              "$(date +'%Y-%m-%d')" "${{ github.actor }}" "${{ env.VERSION }}" \
-              "$(git log --pretty=format:'- %s' $(git describe --tags --abbrev=0 HEAD^)..HEAD)" \
-              "${{ secrets.YC_REGISTRY_ID }}" "${{ env.VERSION }}"
+            --body "$(cat <<EOF\
+          
+          **Date:** $(date +'%Y-%m-%d')
+          
+          **Author:** @${GITHUB_ACTOR}
+          
+          **Commits since last release:**
+          $(git log --pretty=format:'- %s' $(git describe --tags --abbrev=0 HEAD^)..HEAD)
+  
+          **Docker image:**
+          ${YC_REGISTRY}:${{ env.VERSION }}:
+          EOF
+          )"
