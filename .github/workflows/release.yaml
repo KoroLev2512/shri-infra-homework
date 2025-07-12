@@ -105,6 +105,6 @@ jobs:
           $(git log --pretty=format:'- %s' $(git describe --tags --abbrev=0 HEAD^)..HEAD)
   
           **Docker image:**
-          ${YC_REGISTRY}:${{ env.VERSION }}:
+          ${YC_REGISTRY}:${{ env.VERSION }}
           EOF
           )"
