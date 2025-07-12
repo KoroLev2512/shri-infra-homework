@@ -1,0 +1,86 @@
+name: Fix Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release number (for fix)'
+        required: true
+
+env:
+  VERSION: ${{ github.event.inputs.version }}
+
+jobs:
+  lint-plus-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with: { node-version: '24' }
+        
+      - name: installing dependencies
+        run: npm ci
+
+      - name: running linter
+        run: npm run lint
+
+      - name: running tests
+        run: npm run test
+
+  fix-release:
+    name: Build & Publish Fix
+    needs: lint-plus-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: releases/${{ env.VERSION }}
+          fetch-depth: 0
+
+      - name: Define fix number
+        run: echo "FIX_NO=${{ github.run_number }}" >> $GITHUB_ENV
+
+      - name: Build & Push Docker (fix)
+        env:
+          YC_REGISTRY: cr.yandex/${{ secrets.YC_REGISTRY_ID }}/app
+        run: |
+          echo "${{ secrets.YC_OAUTH_TOKEN }}" \
+            | docker login --username oauth --password-stdin cr.yandex
+          docker build \
+            -t ${YC_REGISTRY}:${VERSION}_fix${FIX_NO} \
+            -t ${YC_REGISTRY}:${VERSION}_latest \
+            .
+          docker push ${YC_REGISTRY}:${VERSION}_fix${FIX_NO}
+          docker push ${YC_REGISTRY}:${VERSION}_latest
+
+      - name: Create git tag for fix
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git tag ${VERSION}-fix${FIX_NO}
+          git push origin ${VERSION}-fix${FIX_NO}
+
+      - name: Comment on release Issue
+        env:
+          VERSION: ${{ env.VERSION }}
+          FIX_NO: ${{ env.FIX_NO }}
+          REGID: ${{ secrets.YC_REGISTRY_ID }}
+        run: |
+          PREV_TAG=$(git describe --tags --match "${VERSION}-fix*" --abbrev=0 2>/dev/null \
+                    || echo "${VERSION}")
+
+          COMMITS=$(git log ${PREV_TAG}..HEAD --pretty=format:'- %s')
+         
+          COMMENT_BODY=$(cat <<EOF
+          **Fix Date:** $(date +'%Y-%m-%d')
+          
+          **Fix Author:** @${{ github.actor }}
+          
+          **Commits since ${PREV_TAG}:**
+          ${COMMITS}
+          
+          **Docker image:** cr.yandex/${REGID}/app:${VERSION}_fix${FIX_NO}
+          EOF
+          )
+          gh issue comment ${VERSION} --body "${COMMENT_BODY}"
