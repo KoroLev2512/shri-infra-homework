@@ -1,0 +1,18 @@
+## 11 — 2025-07-13
+- Merge pull request #13 from KoroLev2512/dev
+- Delete testfile
+- Merge pull request #12 from KoroLev2512/dev
+- Create testfile
+- Merge pull request #11 from KoroLev2512/dev
+- Merge pull request #10 from KoroLev2512/releases/1
+- Update README.md
+- Merge pull request #9 from KoroLev2512/dev
+- fix: checkout added
+- Merge pull request #8 from KoroLev2512/dev
+- feat: deploy.yaml created
+- fix: find issue added
+- fix: GH_TOKEN added
+- Merge pull request #7 from KoroLev2512/dev
+- feat: fix-release.yaml created
+- chore: Release
+- Merge pull request #4 from KoroLev2512/dev
