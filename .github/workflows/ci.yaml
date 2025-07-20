@@ -1,10 +1,9 @@
 name: CI (Lint & Test)
 
-on:
-  pull_request:
+on: pull_request
 
 jobs:
-  lint-plus-test:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -13,9 +12,19 @@ jobs:
         
       - name: installing dependencies
         run: npm ci
-
+        
       - name: running linter
         run: npm run lint
 
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with: { node-version: '24' }
+        
+      - name: installing dependencies
+        run: npm ci
+        
       - name: running tests
         run: npm run test
